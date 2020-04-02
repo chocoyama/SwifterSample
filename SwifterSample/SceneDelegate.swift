@@ -12,7 +12,7 @@ import SwiftUI
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
-
+//    let sample = Sample()
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
@@ -62,3 +62,26 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 }
 
+import Swifter
+struct Sample {
+    init() {
+        let server = HttpServer()
+        server["/hello"] = { .ok(.htmlBody("You asked for \($0)"))  }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        do {
+            try server.start(8080, forceIPv4: true)
+//            let log = """
+//            Server has started.
+//            port = \(try server.port())
+//            Try to connect now...
+//            """
+//            print(log)
+          semaphore.wait()
+        } catch {
+          print("Server start error: \(error)")
+          semaphore.signal()
+        }
+
+    }
+}
