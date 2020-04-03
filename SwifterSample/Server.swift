@@ -23,11 +23,19 @@ class Server {
         }
     }
     
+    let port: UInt16
     let httpServer = HttpServer()
     let listening = CurrentValueSubject<Bool, Never>(false)
+    private var session: WebSocketSession?
+    
+    init(port: UInt16) {
+        self.port = port
+    }
     
     var localAddress: String { "127.0.0.1" }
-    func localhostUrl(port: UInt16) -> String { "http://\(localAddress):\(String(port))" }
+    
+    var localhostUrl: String { "http://\(localAddress):\(String(port))" }
+    
     func wifiAddress(for network: Network) -> String? {
         var address : String?
         
@@ -55,9 +63,24 @@ class Server {
         
         return address
     }
-    func wifiUrl(port: UInt16) -> String { "http://\(wifiAddress(for: .ipv4)!):\(String(port))" }
     
-    func start(port: UInt16) {
+    var wifiUrl: String { "http://\(wifiAddress(for: .ipv4)!):\(String(port))" }
+    
+    func setUpWebSocket(path: String) {
+        httpServer[path] = websocket(text: { session, text in
+            self.session = session
+            session.writeText(text)
+        }, binary: { session, binary in
+            self.session = session
+            session.writeBinary(binary)
+        })
+    }
+    
+    func writeWebsocket(text: String) {
+        self.session?.writeText(text)
+    }
+    
+    func start() {
         do {
             try httpServer.start(port, forceIPv4: false)
             listening.send(true)
