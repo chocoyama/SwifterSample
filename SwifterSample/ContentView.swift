@@ -29,7 +29,7 @@ struct ContentView: View {
                 Button(action: {
                     self.httpServer.httpServer["/"] = { _ in
                         let value = "\((100..<20000).randomElement()!)"
-                        let text = String(format: HTML.read(fileName: "sample"), value)
+                        let text = String(format: HTML.read(fileName: "sample")!, value)
                         return .ok(.htmlBody(text))
                     }
                     self.httpServer.start()
@@ -53,8 +53,8 @@ struct ContentView: View {
             } else {
                 Button(action: {
                     let value = "\((100..<20000).randomElement()!)"
-                    let text = String(format: HTML.read(fileName: "sample"), value)
-                    self.websocketServer.write(text: text)
+                    let text = String(format: HTML.read(fileName: "sample")!, value, "hoge")
+                    self.websocketServer.writeTextToClient(text)
                 }) {
                     Text("Send")
                 }

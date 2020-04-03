@@ -19,7 +19,6 @@
 
     function onOpen(evt) {
       output.innerHTML = "CONNECTED";
-      websocket.send("CONNECTED");
     }
 
     function onClose(evt) {
@@ -32,6 +31,10 @@
 
     function onError(evt) {
       output.innerHTML = '<span style="color: red;">ERROR:</span> ' + evt.data;
+    }
+  
+    function sendToServer(text) {
+      websocket.send(text);
     }
     
     window.addEventListener("load", init, false);

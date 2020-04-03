@@ -61,22 +61,32 @@ class WebSocketServer: Server {
     
     func setUp(clientPath: String, serverPath: String, mode: Mode) {
         httpServer[clientPath] = { _ in
-            let websocketUrl = "\(self.url(mode: mode))\(serverPath)"
-            let htmlString = String(format: HTML.read(fileName: "websocket"), websocketUrl)
-            return .ok(.htmlBody(htmlString))
+            if let templateString = HTML.read(fileName: "websocket") {
+                let websocketUrl = "\(self.url(mode: mode))\(serverPath)"
+                let htmlString = String(format: templateString, websocketUrl)
+                return .ok(.htmlBody(htmlString))
+            } else {
+                return .internalServerError
+            }
         }
         
-        httpServer[serverPath] = websocket(text: { session, text in
-            self.session = session
-            session.writeText(text)
-        }, binary: { session, binary in
-            self.session = session
-            session.writeBinary(binary)
-        })
+        httpServer[serverPath] = websocket(
+            connected: { (session) in
+                self.session = session
+            },
+            disconnected: { (session) in
+                self.session = nil
+            }
+        )
     }
     
-    func write(text: String) {
+    func writeTextToClient(_ text: String) {
         self.session?.writeText(text)
+    }
+    
+    override func stop() {
+        self.session?.socket.close()
+        super.stop()
     }
 }
 
@@ -124,10 +134,9 @@ struct Wifi {
 }
 
 struct HTML {
-    static func read(fileName: String) -> String {
-        let url = URL(fileURLWithPath: Bundle.main.path(forResource: fileName, ofType: "html")!)
-        let htmlData = try! Data(contentsOf: url)
-        let htmlString = String(data: htmlData, encoding: .utf8)!
-        return htmlString
+    static func read(fileName: String) -> String? {
+        guard let path = Bundle.main.path(forResource: fileName, ofType: "html"),
+            let htmlData = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
+        return String(data: htmlData, encoding: .utf8)
     }
 }
