@@ -8,63 +8,30 @@
 
 import SwiftUI
 import Swifter
+import Combine
 
 struct ContentView: View {
-    private let server = HttpServer()
+    private let server = Server()
     private let port: UInt16 = 8080
-    private var localhostUrl: String { "http://\(localAddress):\(String(port))" }
-    private var wifiUrl: String { "http://\(wifiAddress!):\(String(port))" }
-    private var localAddress: String { "127.0.0.1" }
-    private var wifiAddress: String? {
-        var address : String?
-        
-        var ifaddr : UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddr) == 0 else { return nil }
-        guard let firstAddr = ifaddr else { return nil }
-        
-        for ifptr in sequence(first: firstAddr, next: { $0.pointee.ifa_next }) {
-            let interface = ifptr.pointee
-            
-            // Check for IPv4 or IPv6 interface:
-            let addrFamily = interface.ifa_addr.pointee.sa_family
-            if addrFamily == UInt8(AF_INET) {
-                //            if addrFamily == UInt8(AF_INET) || addrFamily == UInt8(AF_INET6) {
-                
-                // Check interface name:
-                let name = String(cString: interface.ifa_name)
-                if  name == "en0" {
-                    
-                    // Convert interface address to a human readable string:
-                    var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                    getnameinfo(interface.ifa_addr, socklen_t(interface.ifa_addr.pointee.sa_len),
-                                &hostname, socklen_t(hostname.count),
-                                nil, socklen_t(0), NI_NUMERICHOST)
-                    address = String(cString: hostname)
-                }
-            }
-        }
-        freeifaddrs(ifaddr)
-        
-        return address
-    }
     @State private var listening = false
     @State private var session: WebSocketSession?
+    @State private var cancellables: Set<AnyCancellable> = []
     
     var body: some View {
         VStack(spacing: 16) {
             if listening {
-                Text(localhostUrl)
+                Text(server.localhostUrl(port: port))
                     .gesture(
                         LongPressGesture()
                             .onEnded { _ in
-                                UIPasteboard.general.string = self.localhostUrl
+                                UIPasteboard.general.string = self.server.localhostUrl(port: self.port)
                             }
                     )
-                Text(wifiUrl)
+                Text(server.wifiUrl(port: port))
                     .gesture(
                         LongPressGesture()
                             .onEnded { _ in
-                                UIPasteboard.general.string = self.wifiUrl
+                                UIPasteboard.general.string = self.server.wifiUrl(port: self.port)
                             }
                     )
             } else {
@@ -90,7 +57,7 @@ struct ContentView: View {
             }
             
             Button(action: {
-                self.stopServer()
+                self.server.stop()
             }) {
                 Text("Stop Server")
             }
@@ -100,6 +67,12 @@ struct ContentView: View {
             }) {
                 Text("Send")
             }
+        }.onAppear {
+            self.server.listening
+                .assign(to: \.listening, on: self)
+                .store(in: &self.cancellables)
+        }.onDisappear {
+            self.cancellables.forEach { $0.cancel() }
         }
     }
     
@@ -193,44 +166,30 @@ struct ContentView: View {
     }
     
     private func startHTTP() {
-        server["/"] = { _ in .ok(.htmlBody(self.buildHtmlBody()))  }
-        startServer()
+        server.httpServer["/"] = { _ in .ok(.htmlBody(self.buildHtmlBody()))  }
+        server.start(port: port)
     }
     
     private func startLocalWebSocket() {
-        server["/"] = { _ in .ok(.htmlBody(self.buildWebSocketHtml(with: self.localAddress)))  }
+        server.httpServer["/"] = { _ in .ok(.htmlBody(self.buildWebSocketHtml(with: self.server.localAddress)))  }
         startWebSocket()
-        startServer()
+        server.start(port: port)
     }
     
     private func startWifiWebSocket() {
-        server["/"] = { _ in .ok(.htmlBody(self.buildWebSocketHtml(with: self.wifiAddress!)))  }
+        server.httpServer["/"] = { _ in .ok(.htmlBody(self.buildWebSocketHtml(with: self.server.wifiAddress(for: .ipv4)!)))  }
         startWebSocket()
-        startServer()
+        server.start(port: port)
     }
     
     private func startWebSocket() {
-        server["/websocket"] = websocket(text: { session, text in
+        server.httpServer["/websocket"] = websocket(text: { session, text in
             self.session = session
             session.writeText(text)
         }, binary: { session, binary in
             self.session = session
             session.writeBinary(binary)
         })
-    }
-    
-    private func startServer() {
-        do {
-            try server.start(port, forceIPv4: false)
-            listening = true
-        } catch {
-            print("Server start error: \(error)")
-        }
-    }
-    
-    private func stopServer() {
-        server.stop()
-        listening = false
     }
 
 }
