@@ -11,41 +11,42 @@ import Swifter
 import Combine
 
 struct ContentView: View {
-    private let server = Server(port: 8080)
+    private let httpServer = HTTPServer(port: 8080)
+    private let websocketServer = WebSocketServer(port: 8080)
     @State private var listening = false
     @State private var cancellables: Set<AnyCancellable> = []
     
     var body: some View {
         VStack(spacing: 16) {
             if listening {
-                CopyableText(server.url(scheme: "http", mode: .localhost))
-                CopyableText(server.url(scheme: "http", mode: .lan))
+                CopyableText(httpServer.url(mode: .localhost))
+                CopyableText(httpServer.url(mode: .lan))
             } else {
                 Text("Not Running...")
             }
             
             if !listening {
                 Button(action: {
-                    self.server.httpServer["/"] = { _ in
+                    self.httpServer.httpServer["/"] = { _ in
                         let value = "\((100..<20000).randomElement()!)"
                         let text = String(format: HTML.read(fileName: "sample"), value)
                         return .ok(.htmlBody(text))
                     }
-                    self.server.start()
+                    self.httpServer.start()
                 }) {
                     Text("Start Server")
                 }
                 
                 Button(action: {
-                    self.server.setUpWebSocket(clientPath: "/", serverPath: "/websocket", mode: .localhost)
-                    self.server.start()
+                    self.websocketServer.setUp(clientPath: "/", serverPath: "/websocket", mode: .localhost)
+                    self.websocketServer.start()
                 }) {
                     Text("Start Web Socket (Local)")
                 }
                 
                 Button(action: {
-                    self.server.setUpWebSocket(clientPath: "/", serverPath: "/websocket", mode: .lan)
-                    self.server.start()
+                    self.websocketServer.setUp(clientPath: "/", serverPath: "/websocket", mode: .lan)
+                    self.websocketServer.start()
                 }) {
                     Text("Start Web Socket (Wi-Fi)")
                 }
@@ -53,7 +54,7 @@ struct ContentView: View {
                 Button(action: {
                     let value = "\((100..<20000).randomElement()!)"
                     let text = String(format: HTML.read(fileName: "sample"), value)
-                    self.server.writeWebsocket(text: text)
+                    self.websocketServer.write(text: text)
                 }) {
                     Text("Send")
                 }
@@ -61,13 +62,17 @@ struct ContentView: View {
             
             if listening {
                 Button(action: {
-                    self.server.stop()
+                    self.httpServer.stop()
+                    self.websocketServer.stop()
                 }) {
                     Text("Stop Server")
                 }
             }
         }.onAppear {
-            self.server.listening
+            self.httpServer.listening
+                .assign(to: \.listening, on: self)
+                .store(in: &self.cancellables)
+            self.websocketServer.listening
                 .assign(to: \.listening, on: self)
                 .store(in: &self.cancellables)
         }.onDisappear {
