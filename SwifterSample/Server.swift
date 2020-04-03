@@ -23,6 +23,11 @@ class Server {
         }
     }
     
+    enum Mode {
+        case localhost
+        case lan
+    }
+    
     let port: UInt16
     let httpServer = HttpServer()
     let listening = CurrentValueSubject<Bool, Never>(false)
@@ -32,16 +37,20 @@ class Server {
         self.port = port
     }
     
-    func localhostUrl(scheme: String) -> String {
-        "\(scheme)://127.0.0.1:\(String(port))"
+    func url(scheme: String, mode: Mode) -> String {
+        switch mode {
+        case .localhost: return "\(scheme)://127.0.0.1:\(String(port))"
+        case .lan: return "\(scheme)://\(wifiAddress(for: .ipv4)!):\(String(port))"
+        }
     }
     
-    func lanUrl(scheme: String) -> String {
-        "\(scheme)://\(wifiAddress(for: .ipv4)!):\(String(port))"
-    }
-    
-    func setUpWebSocket(path: String) {
-        httpServer[path] = websocket(text: { session, text in
+    func setUpWebSocket(clientPath: String, serverPath: String, mode: Mode) {
+        httpServer[clientPath] = { _ in
+            let websocketUrl = "\(self.url(scheme: "ws", mode: mode))\(serverPath)"
+            let htmlString = String(format: HTML.read(fileName: "websocket"), websocketUrl)
+            return .ok(.htmlBody(htmlString))
+        }
+        httpServer[serverPath] = websocket(text: { session, text in
             self.session = session
             session.writeText(text)
         }, binary: { session, binary in
@@ -94,5 +103,14 @@ class Server {
         freeifaddrs(ifaddr)
         
         return address
+    }
+}
+
+struct HTML {
+    static func read(fileName: String) -> String {
+        let url = URL(fileURLWithPath: Bundle.main.path(forResource: fileName, ofType: "html")!)
+        let htmlData = try! Data(contentsOf: url)
+        let htmlString = String(data: htmlData, encoding: .utf8)!
+        return htmlString
     }
 }

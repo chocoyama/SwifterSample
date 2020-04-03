@@ -18,56 +18,53 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 16) {
             if listening {
-                CopyableText(server.localhostUrl(scheme: "http"))
-                CopyableText(server.lanUrl(scheme: "http"))
+                CopyableText(server.url(scheme: "http", mode: .localhost))
+                CopyableText(server.url(scheme: "http", mode: .lan))
             } else {
                 Text("Not Running...")
             }
             
-            Button(action: {
-                self.server.httpServer["/"] = { _ in
-                    .ok(.htmlBody(self.buildHtmlBody(value: "\((100..<20000).randomElement()!)")))
+            if !listening {
+                Button(action: {
+                    self.server.httpServer["/"] = { _ in
+                        let value = "\((100..<20000).randomElement()!)"
+                        let text = String(format: HTML.read(fileName: "sample"), value)
+                        return .ok(.htmlBody(text))
+                    }
+                    self.server.start()
+                }) {
+                    Text("Start Server")
                 }
-                self.server.start()
-            }) {
-                Text("Start Server")
-            }
-            
-            Button(action: {
-                self.server.httpServer["/"] = { _ in
-                    let websocketUrl = "\(self.server.localhostUrl(scheme: "ws"))/websocket"
-                    let body = self.buildWebSocketHtml(websocketUrl: websocketUrl)
-                    return .ok(.htmlBody(body))
+                
+                Button(action: {
+                    self.server.setUpWebSocket(clientPath: "/", serverPath: "/websocket", mode: .localhost)
+                    self.server.start()
+                }) {
+                    Text("Start Web Socket (Local)")
                 }
-                self.server.setUpWebSocket(path: "/websocket")
-                self.server.start()
-            }) {
-                Text("Start Web Socket (Local)")
-            }
-            
-            Button(action: {
-                self.server.httpServer["/"] = { _ in
-                    let websocketUrl = "\(self.server.lanUrl(scheme: "ws"))/websocket"
-                    let body = self.buildWebSocketHtml(websocketUrl: websocketUrl)
-                    return .ok(.htmlBody(body))
+                
+                Button(action: {
+                    self.server.setUpWebSocket(clientPath: "/", serverPath: "/websocket", mode: .lan)
+                    self.server.start()
+                }) {
+                    Text("Start Web Socket (Wi-Fi)")
                 }
-                self.server.setUpWebSocket(path: "/websocket")
-                self.server.start()
-            }) {
-                Text("Start Web Socket (Wi-Fi)")
+            } else {
+                Button(action: {
+                    let value = "\((100..<20000).randomElement()!)"
+                    let text = String(format: HTML.read(fileName: "sample"), value)
+                    self.server.writeWebsocket(text: text)
+                }) {
+                    Text("Send")
+                }
             }
             
-            Button(action: {
-                self.server.stop()
-            }) {
-                Text("Stop Server")
-            }
-            
-            Button(action: {
-                let text = self.buildHtmlBody(value: "\((100..<20000).randomElement()!)")
-                self.server.writeWebsocket(text: text)
-            }) {
-                Text("Send")
+            if listening {
+                Button(action: {
+                    self.server.stop()
+                }) {
+                    Text("Stop Server")
+                }
             }
         }.onAppear {
             self.server.listening
@@ -77,24 +74,6 @@ struct ContentView: View {
             self.cancellables.forEach { $0.cancel() }
         }
     }
-    
-    private func buildHtmlBody(value: String) -> String {
-        let htmlString = readHTML(fileName: "sample")
-        return String(format: htmlString, value)
-    }
-    
-    private func buildWebSocketHtml(websocketUrl: String) -> String {
-        let htmlString = readHTML(fileName: "websocket")
-        return String(format: htmlString, websocketUrl)
-    }
-    
-    private func readHTML(fileName: String) -> String {
-        let url = URL(fileURLWithPath: Bundle.main.path(forResource: fileName, ofType: "html")!)
-        let htmlData = try! Data(contentsOf: url)
-        let htmlString = String(data: htmlData, encoding: .utf8)!
-        return htmlString
-    }
-
 }
 
 struct ContentView_Previews: PreviewProvider {
