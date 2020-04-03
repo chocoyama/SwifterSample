@@ -1,62 +1,43 @@
 <!DOCTYPE html>
-<meta charset="utf-8" />
-<script language="javascript" type="text/javascript">
-var wsUri = "%@";
-var output;
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+  <script>
+    const wsUri = "%@";
+    let websocket;
+    let output;
 
-function init()
-{
-  output = document.getElementById("output");
-  testWebSocket();
-}
+    function init() {
+      output = document.getElementById("output");
+      websocket = new WebSocket(wsUri);
+      websocket.onopen = (evt) => { onOpen(evt) };
+      websocket.onclose = (evt) => { onClose(evt) };
+      websocket.onmessage = (evt) => { onMessage(evt) };
+      websocket.onerror = (evt) => { onError(evt) };
+    }
 
-function testWebSocket()
-{
-  websocket = new WebSocket(wsUri);
-  websocket.onopen = function(evt) { onOpen(evt) };
-  websocket.onclose = function(evt) { onClose(evt) };
-  websocket.onmessage = function(evt) { onMessage(evt) };
-  websocket.onerror = function(evt) { onError(evt) };
-}
+    function onOpen(evt) {
+      output.innerHTML = "CONNECTED";
+      websocket.send("CONNECTED");
+    }
 
-function onOpen(evt)
-{
-  writeToScreen("CONNECTED");
-  doSend("CONNECTED");
-}
+    function onClose(evt) {
+      output.innerHTML = "DISCONNECTED";
+    }
 
-function onClose(evt)
-{
-  writeToScreen("DISCONNECTED");
-}
+    function onMessage(evt) {
+      output.innerHTML = evt.data;
+    }
 
-function onMessage(evt)
-{
-  output.innerHTML = evt.data;
-  // writeToScreen('<span style="color: blue;">RESPONSE: ' + evt.data+'</span>');
-}
-
-function onError(evt)
-{
-  writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
-}
-
-function doSend(message)
-{
-  // writeToScreen("SENT: " + message);
-  websocket.send(message);
-}
-
-function writeToScreen(message)
-{
-  var pre = document.createElement("p");
-  pre.style.wordWrap = "break-word";
-  pre.innerHTML = message;
-  output.appendChild(pre);
-}
-
-window.addEventListener("load", init, false);
-
-</script>
-
+    function onError(evt) {
+      output.innerHTML = '<span style="color: red;">ERROR:</span> ' + evt.data;
+    }
+    
+    window.addEventListener("load", init, false);
+  </script>
+</head>
+<body>
 <div id="output"></div>
+</body>
+</html>
