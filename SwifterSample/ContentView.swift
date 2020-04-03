@@ -18,26 +18,16 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 16) {
             if listening {
-                Text(server.localhostUrl)
-                    .gesture(
-                        LongPressGesture()
-                            .onEnded { _ in
-                                UIPasteboard.general.string = self.server.localhostUrl
-                            }
-                    )
-                Text(server.wifiUrl)
-                    .gesture(
-                        LongPressGesture()
-                            .onEnded { _ in
-                                UIPasteboard.general.string = self.server.wifiUrl
-                            }
-                    )
+                CopyableText(server.localhostUrl(scheme: "http"))
+                CopyableText(server.lanUrl(scheme: "http"))
             } else {
                 Text("Not Running...")
             }
             
             Button(action: {
-                self.server.httpServer["/"] = { _ in .ok(.htmlBody(self.buildHtmlBody()))  }
+                self.server.httpServer["/"] = { _ in
+                    .ok(.htmlBody(self.buildHtmlBody(value: "\((100..<20000).randomElement()!)")))
+                }
                 self.server.start()
             }) {
                 Text("Start Server")
@@ -45,9 +35,8 @@ struct ContentView: View {
             
             Button(action: {
                 self.server.httpServer["/"] = { _ in
-                    let body = self.buildWebSocketHtml(with: self.server.localAddress,
-                                                       port: self.server.port,
-                                                       path: "/websocket")
+                    let websocketUrl = "\(self.server.localhostUrl(scheme: "ws"))/websocket"
+                    let body = self.buildWebSocketHtml(websocketUrl: websocketUrl)
                     return .ok(.htmlBody(body))
                 }
                 self.server.setUpWebSocket(path: "/websocket")
@@ -58,9 +47,8 @@ struct ContentView: View {
             
             Button(action: {
                 self.server.httpServer["/"] = { _ in
-                    let body = self.buildWebSocketHtml(with: self.server.localAddress,
-                                                       port: self.server.port,
-                                                       path: "/websocket")
+                    let websocketUrl = "\(self.server.lanUrl(scheme: "ws"))/websocket"
+                    let body = self.buildWebSocketHtml(websocketUrl: websocketUrl)
                     return .ok(.htmlBody(body))
                 }
                 self.server.setUpWebSocket(path: "/websocket")
@@ -76,7 +64,8 @@ struct ContentView: View {
             }
             
             Button(action: {
-                self.server.writeWebsocket(text: self.buildHtmlBody())
+                let text = self.buildHtmlBody(value: "\((100..<20000).randomElement()!)")
+                self.server.writeWebsocket(text: text)
             }) {
                 Text("Send")
             }
@@ -89,15 +78,13 @@ struct ContentView: View {
         }
     }
     
-    private func buildHtmlBody() -> String {
+    private func buildHtmlBody(value: String) -> String {
         let htmlString = readHTML(fileName: "sample")
-        let value = "\((100..<20000).randomElement()!)"
         return String(format: htmlString, value)
     }
     
-    private func buildWebSocketHtml(with address: String, port: UInt16, path: String?) -> String {
+    private func buildWebSocketHtml(websocketUrl: String) -> String {
         let htmlString = readHTML(fileName: "websocket")
-        let websocketUrl = "ws://\(address):\(port)\(path ?? "")"
         return String(format: htmlString, websocketUrl)
     }
     
@@ -113,5 +100,23 @@ struct ContentView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
+    }
+}
+
+struct CopyableText: View {
+    private let text: String
+    
+    init(_ text: String) {
+        self.text = text
+    }
+    
+    var body: some View {
+        Text(text)
+            .gesture(
+                LongPressGesture()
+                    .onEnded { _ in
+                        UIPasteboard.general.string = self.text
+                    }
+            )
     }
 }
